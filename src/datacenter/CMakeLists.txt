@@ -12,6 +12,7 @@ build_lib(
     model/inter-level-template.cc
     model/intra-level-template.cc
     model/congestion-signal-provider.cc
+    model/bcube-layer-template.cc
     model/dragonfly-valiant-routing.cc
     model/dragonfly-ugal-routing.cc
     model/full-intra-level-template.cc
@@ -32,6 +33,7 @@ build_lib(
     model/structured-topology.cc
     model/symmetric-degree-graph.cc
     model/topology-builder.cc
+    model/mesh-intra-level-template.cc
     model/torus-intra-level-template.cc
 
   HEADER_FILES
@@ -45,6 +47,7 @@ build_lib(
     helper/failure-helper.h
     model/inter-level-template.h
     model/intra-level-template.h
+    model/bcube-layer-template.h
     model/congestion-signal-provider.h
     model/dragonfly-valiant-routing.h
     model/dragonfly-ugal-routing.h
@@ -66,6 +69,7 @@ build_lib(
     model/structured-topology.h
     model/symmetric-degree-graph.h
     model/topology-builder.h
+    model/mesh-intra-level-template.h
     utils/json.hpp
     model/torus-intra-level-template.h
   LIBRARIES_TO_LINK ${libnetwork}

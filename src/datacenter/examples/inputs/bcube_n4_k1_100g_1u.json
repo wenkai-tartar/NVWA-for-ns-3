@@ -1,0 +1,27 @@
+{
+  "routing": "RuleBased",
+  "link": {
+    "bandwidth": "100Gbps",
+    "delay": "1us"
+  },
+  "levels": [
+    {
+      "dims": [
+        {
+          "template": "BCubeLayer",
+          "nodeNum": 1,
+          "subBlockNum": 4
+        }
+      ]
+    },
+    {
+      "dims": [
+        {
+          "template": "BCubeLayer",
+          "nodeNum": 4,
+          "subBlockNum": 4
+        }
+      ]
+    }
+  ]
+}

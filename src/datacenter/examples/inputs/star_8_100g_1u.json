@@ -1,0 +1,19 @@
+{
+  "routing": "RuleBased",
+  "link": {
+    "bandwidth": "100Gbps",
+    "delay": "1us"
+  },
+  "levels": [
+    {
+      "dims": [
+        {
+          "template": "ClosLayer",
+          "nodeNum": 1,
+          "subBlockNum": 8,
+          "group_num": 1
+        }
+      ]
+    }
+  ]
+}

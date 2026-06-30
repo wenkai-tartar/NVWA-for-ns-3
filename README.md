@@ -95,6 +95,19 @@ python3 src/datacenter/examples/inputs/topology_generator.py dragonfly --groups 
 python3 src/datacenter/examples/inputs/topology_generator.py rail_optimized --gpus 256 --gpus-per-server 8 --nics-per-aswitch 16 --psw-switches 8
 ```
 
+Paper topology inputs are also provided as small, runnable construction
+examples:
+
+| Topology family | Config |
+| --- | --- |
+| Clos / Fat-tree | `clos.json`, `fattree_k4.json`, `fattree_k4_100g_1u.json` |
+| Oversubscribed or multihomed Fat-tree | `multihomed_fattree_k4_100g_1u.json` |
+| Dragonfly / Dragonfly+ | `dragonfly_g5_a2_p2_h2_100g_1u.json`, `dragonfly_plus_g3_a2_p2_h1_100g_1u.json` |
+| BCube / ZCube | `bcube_n4_k1_100g_1u.json`, `zcube_n4_k1_100g_1u.json` |
+| Mesh / FullMesh / Torus | `mesh_3x3_100g_1u.json`, `fullmesh_4_100g_1u.json`, `torus_3x3x3_100g_1u.json` |
+| HPN / UB-Mesh | `hpn_small_100g_1u.json`, `ub_mesh_2x2_100g_1u.json` |
+| Rail-optimized / Star / VL2 | `rail_optimized_g256_gps8_npa16_psw8_100g_1u.json`, `star_8_100g_1u.json`, `vl2_small_100g_1u.json` |
+
 The constructor example resolves bare config names such as `fattree_k4.json`
 from `src/datacenter/examples/inputs`. Failure files are resolved from
 `src/datacenter/examples/inputs/failures` when only a file name is supplied.
@@ -130,9 +143,15 @@ Core topology components:
 - `StructuredAddress`, `StructuredAddressDirectory`, and `StructuredTopology`
   define hierarchical node addresses and topology lookup.
 - `TopologyBuilder` composes topology levels from reusable templates.
-- `ClosInterLevelTemplate`, `FullIntraLevelTemplate`,
-  `TorusIntraLevelTemplate`, and `IntraServerLevelTemplate` describe common
-  datacenter construction patterns.
+- The JSON constructor accepts the paper template names `ClosLayer`,
+  `BCubeLayer`, `ZCubeLayer`, `CliqeLF`, `CliqeToR`, `DimMesh`,
+  `DimFullMesh`, and `DimTorus`. It also keeps the older implementation names
+  `ClosInterLevel`, `FullIntraLevel`, `TorusIntraLevel`, and
+  `IntraServerLevel` for compatibility.
+- `ClosInterLevelTemplate`, `BCubeLayerTemplate`, `ZCubeLayerTemplate`,
+  `MeshIntraLevelTemplate`, `FullIntraLevelTemplate`,
+  `TorusIntraLevelTemplate`, and `IntraServerLevelTemplate` describe the
+  reusable construction patterns.
 
 Routing components:
 
@@ -149,9 +168,10 @@ Input configuration:
 
 - Topology JSON files describe `routing`, default `link` parameters, and a list
   of `levels`.
-- Each level contains one or more `dims`; each dim selects a template such as
-  `ClosInterLevel`, `FullIntraLevel`, `TorusIntraLevel`, or
-  `IntraServerLevel`.
+- Each level contains one or more `dims`; each dim selects one of the supported
+  interconnection templates listed above. Common paper-style parameters such as
+  `group_num`, `dim`, and `mode` are accepted alongside the legacy camelCase
+  fields.
 - Failure JSON files contain scheduled link failures and are consumed by
   `FailureHelper`.
 

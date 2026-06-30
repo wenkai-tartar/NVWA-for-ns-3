@@ -1019,6 +1019,53 @@ BuildFromJson(const json& cfg,
         return LevelTemplate::LinkProfile{DataRate(dim.value("bandwidth", bwStr)),
                                           Time(dim.value("delay", delayStr))};
     };
+    auto getUint = [](const json& dim,
+                      std::initializer_list<const char*> keys,
+                      uint32_t defaultValue,
+                      bool required) -> uint32_t {
+        for (const char* key : keys)
+        {
+            if (dim.contains(key))
+            {
+                return dim.at(key).get<uint32_t>();
+            }
+        }
+        if (required)
+        {
+            std::ostringstream oss;
+            oss << "Missing required JSON field";
+            for (const char* key : keys)
+            {
+                oss << " " << key;
+            }
+            NS_ABORT_MSG(oss.str());
+        }
+        return defaultValue;
+    };
+    auto getString = [](const json& dim,
+                        std::initializer_list<const char*> keys,
+                        const std::string& defaultValue) -> std::string {
+        for (const char* key : keys)
+        {
+            if (dim.contains(key))
+            {
+                return dim.at(key).get<std::string>();
+            }
+        }
+        return defaultValue;
+    };
+    auto normalizeCliqueArrangement = [](std::string mode) -> std::string {
+        if (mode == "abs" || mode == "absolute" || mode == "Absolute")
+        {
+            return "Absolute";
+        }
+        if (mode == "rel" || mode == "relative" || mode == "Relative" ||
+            mode == "SameRank" || mode == "Default")
+        {
+            return "SameRank";
+        }
+        return mode;
+    };
 
     // Track an aggregate ECMP policy for NodeBfs (kRandom > kByHash > kFirst)
     bool sawRandom = false;
@@ -1068,7 +1115,8 @@ BuildFromJson(const json& cfg,
 
             LevelTemplate::LinkProfile dimLink = getLinkProfile(dim);
 
-            if (type == "IntraServerLevel" || type == "RailOptimizedHostLevel")
+            if (type == "IntraServerLevel" || type == "IntraHost" ||
+                type == "RailOptimizedHostLevel")
             {
                 uint32_t endpointsPerServer = 0;
                 if (dim.contains("endpointsPerServer"))
@@ -1121,13 +1169,14 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "ClosInterLevel")
+            else if (type == "ClosInterLevel" || type == "ClosLayer")
             {
                 ++levelId;
-                uint32_t nodeNum = dim.at("nodeNum");
-                uint32_t subBlockNum = dim.at("subBlockNum");
-                uint32_t groupNum = dim.at("groupNum");
-                std::string linkArrangement = dim.value("linkArrangement", "Contiguous");
+                uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, true);
+                uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num"}, 0, true);
+                uint32_t groupNum = getUint(dim, {"groupNum", "group_num"}, 1, false);
+                std::string linkArrangement =
+                    getString(dim, {"linkArrangement", "link_arrangement"}, "Contiguous");
 
                 Ptr<ClosInterLevelTemplate> t;
                 if (linkArrangement == "RailOptimized")
@@ -1176,13 +1225,42 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "TorusIntraLevel")
+            else if (type == "BCubeLayer")
+            {
+                ++levelId;
+                uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, true);
+                uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num"}, 0, true);
+                Ptr<BCubeLayerTemplate> t =
+                    CreateObject<BCubeLayerTemplate>(levelId, dimId, nodeNum, subBlockNum, dimLink);
+                if (hasLoadBalance)
+                {
+                    t->SetPortSelectPolicy(portPolicy);
+                }
+                t->SetTopologyHelper(topoHelper);
+                builder.AddLevel(t);
+            }
+            else if (type == "ZCubeLayer")
+            {
+                ++levelId;
+                uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, true);
+                uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num"}, 0, true);
+                Ptr<ZCubeLayerTemplate> t =
+                    CreateObject<ZCubeLayerTemplate>(levelId, dimId, nodeNum, subBlockNum, dimLink);
+                if (hasLoadBalance)
+                {
+                    t->SetPortSelectPolicy(portPolicy);
+                }
+                t->SetTopologyHelper(topoHelper);
+                builder.AddLevel(t);
+            }
+            else if (type == "TorusIntraLevel" || type == "DimTorus")
             {
                 // Important: levelId should not be incremented here
                 ++dimId;
-                uint32_t nodeNum = dim.at("nodeNum");
-                uint32_t subBlockNum = dim.at("subBlockNum");
-                std::string linkArrangement = dim.at("LinkArrangement");
+                uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, false);
+                uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num", "dim"}, 0, true);
+                std::string linkArrangement =
+                    getString(dim, {"LinkArrangement", "linkArrangement", "link_arrangement"}, "SameRank");
                 Ptr<TorusIntraLevelTemplate> t =
                     CreateObject<TorusIntraLevelTemplate>(levelId,
                                                           dimId,
@@ -1197,14 +1275,41 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "FullIntraLevel")
+            else if (type == "MeshIntraLevel" || type == "DimMesh")
             {
                 // Important: levelId should not be incremented here
                 ++dimId;
-                uint32_t nodeNum = dim.at("nodeNum");
-                uint32_t subBlockNum = dim.at("subBlockNum");
-                uint32_t outLinkNum = dim.at("outLinkNum");
-                std::string linkArrangement = dim.at("linkArrangement");
+                uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, false);
+                uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num", "dim"}, 0, true);
+                std::string linkArrangement =
+                    getString(dim, {"LinkArrangement", "linkArrangement", "link_arrangement"}, "SameRank");
+                Ptr<MeshIntraLevelTemplate> t =
+                    CreateObject<MeshIntraLevelTemplate>(levelId,
+                                                         dimId,
+                                                         nodeNum,
+                                                         subBlockNum,
+                                                         linkArrangement,
+                                                         dimLink);
+                if (hasLoadBalance)
+                {
+                    t->SetPortSelectPolicy(portPolicy);
+                }
+                t->SetTopologyHelper(topoHelper);
+                builder.AddLevel(t);
+            }
+            else if (type == "FullIntraLevel" || type == "DimFullMesh" ||
+                     type == "CliqeToR" || type == "CliqueToR" ||
+                     type == "CliqeLF" || type == "CliqueLF")
+            {
+                // Important: levelId should not be incremented here
+                ++dimId;
+                uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, false);
+                uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num", "dim"}, 0, true);
+                uint32_t outLinkNum = getUint(dim, {"outLinkNum", "out_link_num"}, 1, false);
+                std::string defaultArrangement =
+                    (type == "CliqeToR" || type == "CliqueToR") ? "abs" : "SameRank";
+                std::string linkArrangement = normalizeCliqueArrangement(
+                    getString(dim, {"linkArrangement", "link_arrangement", "mode"}, defaultArrangement));
                 Ptr<FullIntraLevelTemplate> t =
                     CreateObject<FullIntraLevelTemplate>(levelId,
                                                          dimId,

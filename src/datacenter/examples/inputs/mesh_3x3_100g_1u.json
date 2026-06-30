@@ -1,0 +1,21 @@
+{
+  "routing": "RuleBased",
+  "link": {
+    "bandwidth": "100Gbps",
+    "delay": "1us"
+  },
+  "levels": [
+    {
+      "dims": [
+        {
+          "template": "DimMesh",
+          "dim": 3
+        },
+        {
+          "template": "DimMesh",
+          "dim": 3
+        }
+      ]
+    }
+  ]
+}
