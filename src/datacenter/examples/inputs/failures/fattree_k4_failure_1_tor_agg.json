@@ -1,0 +1,12 @@
+{
+  "failures": [
+    {
+      "link": {
+        "src": {"level": 1, "local_index": 0},
+        "dst": {"level": 2, "local_index": 0}
+      },
+      "failure_time": 0.5,
+      "failure_time_unit": "s"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "routing": "RuleBased",
+  "link": {
+    "bandwidth": "10Gbps",
+    "delay": "1us"
+  },
+  "levels": [
+    {
+      "dims": [
+        {
+          "template": "ClosInterLevel",
+          "nodeNum": 1,
+          "subBlockNum": 2,
+          "groupNum": 1
+        }
+      ]
+    },
+    {
+      "dims": [
+        {
+          "template": "ClosInterLevel",
+          "nodeNum": 2,
+          "subBlockNum": 2,
+          "groupNum": 1
+        }
+      ]
+    },
+    {
+      "dims": [
+        {
+          "template": "ClosInterLevel",
+          "nodeNum": 4,
+          "subBlockNum": 4,
+          "groupNum": 1
+        }
+      ]
+    }
+  ]
+}
