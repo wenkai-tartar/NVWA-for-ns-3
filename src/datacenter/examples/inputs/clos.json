@@ -8,7 +8,7 @@
     {
       "dims": [
         {
-          "template": "ClosInterLevel",
+          "template": "ClosLayer",
           "nodeNum": 1,
           "subBlockNum": 2,
           "groupNum": 1
@@ -18,7 +18,7 @@
     {
       "dims": [
         {
-          "template": "ClosInterLevel",
+          "template": "ClosLayer",
           "nodeNum": 2,
           "subBlockNum": 2,
           "groupNum": 1
@@ -28,7 +28,7 @@
     {
       "dims": [
         {
-          "template": "ClosInterLevel",
+          "template": "ClosLayer",
           "nodeNum": 4,
           "subBlockNum": 4,
           "groupNum": 1

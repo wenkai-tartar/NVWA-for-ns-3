@@ -1,0 +1,33 @@
+{
+  "routing": "RuleBased",
+  "link": {
+    "bandwidth": "100Gbps",
+    "delay": "1us"
+  },
+  "levels": [
+    {
+      "dims": [
+        {
+          "template": "ClosLayer",
+          "nodeNum": 1,
+          "subBlockNum": 2,
+          "groupNum": 1
+        },
+        {
+          "template": "CliqeToR",
+          "nodeNum": 0,
+          "dim": 2,
+          "outLinkNum": 1,
+          "mode": "rel"
+        },
+        {
+          "template": "CliqeToR",
+          "nodeNum": 0,
+          "dim": 5,
+          "outLinkNum": 2,
+          "mode": "abs"
+        }
+      ]
+    }
+  ]
+}

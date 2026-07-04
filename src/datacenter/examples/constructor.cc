@@ -1054,6 +1054,48 @@ BuildFromJson(const json& cfg,
         }
         return defaultValue;
     };
+    auto normalizeToken = [](std::string token) -> std::string {
+        token.erase(std::remove_if(token.begin(),
+                                   token.end(),
+                                   [](unsigned char c) {
+                                       return c == '_' || c == '-' || std::isspace(c);
+                                   }),
+                    token.end());
+        std::transform(token.begin(),
+                       token.end(),
+                       token.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return token;
+    };
+    auto normalizeLinkArrangement = [&](std::string arrangement) -> std::string {
+        std::string token = normalizeToken(arrangement);
+        if (token == "default")
+        {
+            return "Default";
+        }
+        if (token == "contiguous")
+        {
+            return "Contiguous";
+        }
+        if (token == "fullmesh")
+        {
+            return "FullMesh";
+        }
+        if (token == "railoptimized")
+        {
+            return "RailOptimized";
+        }
+        if (token == "samerank" || token == "samelevel" || token == "rel" ||
+            token == "relative")
+        {
+            return "SameRank";
+        }
+        if (token == "absolute" || token == "abs")
+        {
+            return "Absolute";
+        }
+        return arrangement;
+    };
     auto normalizeCliqueArrangement = [](std::string mode) -> std::string {
         if (mode == "abs" || mode == "absolute" || mode == "Absolute")
         {
@@ -1076,28 +1118,36 @@ BuildFromJson(const json& cfg,
     for (const auto& lv : cfg.at("levels"))
     {
         uint32_t dimId = 0;
-        // Each level contains a dims array
-        for (const auto& dim : lv.at("dims"))
+        const json dims = lv.contains("dims") ? lv.at("dims") : json::array({lv});
+        // A level may either wrap one or more dimensions in dims, or provide one template directly.
+        for (const auto& dim : dims)
         {
-            std::string type = dim.at("template");
+            std::string type = getString(dim, {"template", "Template"}, "");
+            if (type.empty())
+            {
+                NS_ABORT_MSG("Missing required JSON field template");
+            }
+            std::string typeToken = normalizeToken(type);
 
             // Read load-balance policy from JSON if specified
             PortSelectPolicy portPolicy = PortSelectPolicy::kFirst;  // Default policy
             bool hasLoadBalance = false;
-            if (dim.contains("loadBalance"))
+            std::string loadBalanceStr = getString(dim, {"loadBalance", "load_balance"}, "");
+            if (!loadBalanceStr.empty())
             {
-                std::string loadBalanceStr = dim.at("loadBalance");
+                std::string loadBalanceToken = normalizeToken(loadBalanceStr);
                 hasLoadBalance = true;
-                if (loadBalanceStr == "kFirst")
+                if (loadBalanceToken == "kfirst" || loadBalanceToken == "first")
                 {
                     portPolicy = PortSelectPolicy::kFirst;
                 }
-                else if (loadBalanceStr == "kRandom")
+                else if (loadBalanceToken == "krandom" || loadBalanceToken == "random")
                 {
                     portPolicy = PortSelectPolicy::kRandom;
                     sawRandom = true;
                 }
-                else if (loadBalanceStr == "kByHash" || loadBalanceStr == "kHash")
+                else if (loadBalanceToken == "kbyhash" || loadBalanceToken == "khash" ||
+                         loadBalanceToken == "byhash" || loadBalanceToken == "hash")
                 {
                     portPolicy = PortSelectPolicy::kByHash;
                     sawByHash = true;
@@ -1115,17 +1165,29 @@ BuildFromJson(const json& cfg,
 
             LevelTemplate::LinkProfile dimLink = getLinkProfile(dim);
 
-            if (type == "IntraServerLevel" || type == "IntraHost" ||
-                type == "RailOptimizedHostLevel")
+            if (typeToken == "intraserverlevel" || typeToken == "intrahost" ||
+                typeToken == "railoptimizedhostlevel")
             {
                 uint32_t endpointsPerServer = 0;
                 if (dim.contains("endpointsPerServer"))
                 {
                     endpointsPerServer = dim.at("endpointsPerServer");
                 }
+                else if (dim.contains("endpointPerServer"))
+                {
+                    endpointsPerServer = dim.at("endpointPerServer");
+                }
+                else if (dim.contains("endpoints_per_server"))
+                {
+                    endpointsPerServer = dim.at("endpoints_per_server");
+                }
                 else if (dim.contains("gpuPerServer"))
                 {
                     endpointsPerServer = dim.at("gpuPerServer");
+                }
+                else if (dim.contains("gpu_per_server"))
+                {
+                    endpointsPerServer = dim.at("gpu_per_server");
                 }
                 else
                 {
@@ -1137,6 +1199,10 @@ BuildFromJson(const json& cfg,
                 {
                     serverNum = dim.at("serverNum");
                 }
+                else if (dim.contains("server_num"))
+                {
+                    serverNum = dim.at("server_num");
+                }
                 else
                 {
                     uint32_t endpointNum = 0;
@@ -1144,9 +1210,17 @@ BuildFromJson(const json& cfg,
                     {
                         endpointNum = dim.at("endpointNum");
                     }
+                    else if (dim.contains("endpoint_num"))
+                    {
+                        endpointNum = dim.at("endpoint_num");
+                    }
                     else if (dim.contains("gpuNum"))
                     {
                         endpointNum = dim.at("gpuNum");
+                    }
+                    else if (dim.contains("gpu_num"))
+                    {
+                        endpointNum = dim.at("gpu_num");
                     }
                     else
                     {
@@ -1157,7 +1231,8 @@ BuildFromJson(const json& cfg,
                     serverNum = endpointNum / endpointsPerServer;
                 }
 
-                std::string linkArrangement = dim.value("linkArrangement", "FullMesh");
+                std::string linkArrangement = normalizeLinkArrangement(
+                    getString(dim, {"linkArrangement", "LinkArrangement", "link_arrangement"}, "FullMesh"));
                 Ptr<IntraServerLevelTemplate> t = CreateObject<IntraServerLevelTemplate>(serverNum,
                                                                                          endpointsPerServer,
                                                                                          linkArrangement,
@@ -1169,14 +1244,15 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "ClosInterLevel" || type == "ClosLayer")
+            else if (typeToken == "closinterlevel" || typeToken == "closlayer" ||
+                     typeToken == "singleinterlevel")
             {
                 ++levelId;
                 uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, true);
                 uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num"}, 0, true);
                 uint32_t groupNum = getUint(dim, {"groupNum", "group_num"}, 1, false);
-                std::string linkArrangement =
-                    getString(dim, {"linkArrangement", "link_arrangement"}, "Contiguous");
+                std::string linkArrangement = normalizeLinkArrangement(
+                    getString(dim, {"linkArrangement", "LinkArrangement", "link_arrangement"}, "Contiguous"));
 
                 Ptr<ClosInterLevelTemplate> t;
                 if (linkArrangement == "RailOptimized")
@@ -1186,15 +1262,28 @@ BuildFromJson(const json& cfg,
                     {
                         endpointsPerServer = dim.at("endpointsPerServer");
                     }
+                    else if (dim.contains("endpointPerServer"))
+                    {
+                        endpointsPerServer = dim.at("endpointPerServer");
+                    }
+                    else if (dim.contains("endpoints_per_server"))
+                    {
+                        endpointsPerServer = dim.at("endpoints_per_server");
+                    }
                     else if (dim.contains("gpuPerServer"))
                     {
                         endpointsPerServer = dim.at("gpuPerServer");
+                    }
+                    else if (dim.contains("gpu_per_server"))
+                    {
+                        endpointsPerServer = dim.at("gpu_per_server");
                     }
                     else
                     {
                         NS_ABORT_MSG("RailOptimized ClosInterLevel requires endpointsPerServer");
                     }
-                    uint32_t nicsPerAswitch = dim.at("nicsPerAswitch");
+                    uint32_t nicsPerAswitch =
+                        getUint(dim, {"nicsPerAswitch", "nics_per_aswitch"}, 0, true);
                     t = CreateObject<ClosInterLevelTemplate>(levelId,
                                                              dimId,
                                                              nodeNum,
@@ -1225,7 +1314,7 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "BCubeLayer")
+            else if (typeToken == "bcubelayer")
             {
                 ++levelId;
                 uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, true);
@@ -1239,7 +1328,7 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "ZCubeLayer")
+            else if (typeToken == "zcubelayer")
             {
                 ++levelId;
                 uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, true);
@@ -1253,14 +1342,14 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "TorusIntraLevel" || type == "DimTorus")
+            else if (typeToken == "torusintralevel" || typeToken == "dimtorus")
             {
                 // Important: levelId should not be incremented here
                 ++dimId;
                 uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, false);
                 uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num", "dim"}, 0, true);
-                std::string linkArrangement =
-                    getString(dim, {"LinkArrangement", "linkArrangement", "link_arrangement"}, "SameRank");
+                std::string linkArrangement = normalizeLinkArrangement(
+                    getString(dim, {"LinkArrangement", "linkArrangement", "link_arrangement"}, "SameRank"));
                 Ptr<TorusIntraLevelTemplate> t =
                     CreateObject<TorusIntraLevelTemplate>(levelId,
                                                           dimId,
@@ -1275,14 +1364,14 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "MeshIntraLevel" || type == "DimMesh")
+            else if (typeToken == "meshintralevel" || typeToken == "dimmesh")
             {
                 // Important: levelId should not be incremented here
                 ++dimId;
                 uint32_t nodeNum = getUint(dim, {"nodeNum", "node_num"}, 0, false);
                 uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num", "dim"}, 0, true);
-                std::string linkArrangement =
-                    getString(dim, {"LinkArrangement", "linkArrangement", "link_arrangement"}, "SameRank");
+                std::string linkArrangement = normalizeLinkArrangement(
+                    getString(dim, {"LinkArrangement", "linkArrangement", "link_arrangement"}, "SameRank"));
                 Ptr<MeshIntraLevelTemplate> t =
                     CreateObject<MeshIntraLevelTemplate>(levelId,
                                                          dimId,
@@ -1297,9 +1386,9 @@ BuildFromJson(const json& cfg,
                 t->SetTopologyHelper(topoHelper);
                 builder.AddLevel(t);
             }
-            else if (type == "FullIntraLevel" || type == "DimFullMesh" ||
-                     type == "CliqeToR" || type == "CliqueToR" ||
-                     type == "CliqeLF" || type == "CliqueLF")
+            else if (typeToken == "fullintralevel" || typeToken == "dimfullmesh" ||
+                     typeToken == "cliqetor" || typeToken == "cliquetor" ||
+                     typeToken == "cliqelf" || typeToken == "cliquelf")
             {
                 // Important: levelId should not be incremented here
                 ++dimId;
@@ -1307,9 +1396,12 @@ BuildFromJson(const json& cfg,
                 uint32_t subBlockNum = getUint(dim, {"subBlockNum", "sub_block_num", "dim"}, 0, true);
                 uint32_t outLinkNum = getUint(dim, {"outLinkNum", "out_link_num"}, 1, false);
                 std::string defaultArrangement =
-                    (type == "CliqeToR" || type == "CliqueToR") ? "abs" : "SameRank";
-                std::string linkArrangement = normalizeCliqueArrangement(
-                    getString(dim, {"linkArrangement", "link_arrangement", "mode"}, defaultArrangement));
+                    (typeToken == "cliqetor" || typeToken == "cliquetor") ? "abs" : "SameRank";
+                std::string linkArrangement = normalizeLinkArrangement(
+                    normalizeCliqueArrangement(getString(
+                        dim,
+                        {"linkArrangement", "LinkArrangement", "link_arrangement", "mode"},
+                        defaultArrangement)));
                 Ptr<FullIntraLevelTemplate> t =
                     CreateObject<FullIntraLevelTemplate>(levelId,
                                                          dimId,

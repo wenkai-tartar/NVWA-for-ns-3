@@ -71,7 +71,7 @@ class TopologyGenerator:
 
         # Host level (leaf nodes)
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": hosts_per_leaf,
             "subBlockNum": leaf_count,
             "groupNum": 1
@@ -79,7 +79,7 @@ class TopologyGenerator:
 
         # Leaf level
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": leaf_count,
             "subBlockNum": spine_count,
             "groupNum": 1
@@ -87,7 +87,7 @@ class TopologyGenerator:
 
         # Spine level
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": spine_count,
             "subBlockNum": 1,  # connect to core network
             "groupNum": 1
@@ -129,7 +129,7 @@ class TopologyGenerator:
         hosts_per_switch = k // 2
 
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": 1,
             "subBlockNum": hosts_per_switch,   # hosts per edge switch
             "groupNum": 1
@@ -142,19 +142,18 @@ class TopologyGenerator:
         edges_per_pod = k // 2
 
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": aggs_per_pod,        # aggregation switches per pod
             "subBlockNum": edges_per_pod,    # edge switches per pod
             "groupNum": 1
         }, load_balance))
 
-        # Level 2: Core level
-        # Core level connects to pods using SingleInterLevel
+        # Level 2: Core layer connects to pods.
         core_group_num = k // 2
         core_switches = core_group_num ** 2
 
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": core_switches,         # core switches
             "subBlockNum": k,            # connect to pods
             "groupNum": core_group_num
@@ -240,9 +239,9 @@ class TopologyGenerator:
 
         dims: List[Dict[str, Any]] = []
 
-        # Level 1: hosts to routers (Clos inter-level)
+        # Level 1: hosts to routers.
         host_dim = {
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": 1,
             "subBlockNum": hosts_per_router,
             "groupNum": 1
@@ -251,25 +250,25 @@ class TopologyGenerator:
             host_dim["loadBalance"] = load_balance
         dims.append(host_dim)
 
-        # Level 2: intra-group full mesh (FullIntra, SameRank)
+        # Level 2: intra-group clique.
         local_dim = {
-            "template": "FullIntraLevel",
+            "template": "CliqeToR",
             "nodeNum": 0,
-            "subBlockNum": routers_per_group,
+            "dim": routers_per_group,
             "outLinkNum": 1,
-            "linkArrangement": "SameRank"
+            "mode": "rel"
         }
         if load_balance:
             local_dim["loadBalance"] = load_balance
         dims.append(local_dim)
 
-        # Level 3: inter-group global links (FullIntra, Absolute)
+        # Level 3: inter-group global links.
         global_dim = {
-            "template": "FullIntraLevel",
+            "template": "CliqeToR",
             "nodeNum": 0,
-            "subBlockNum": groups,
+            "dim": groups,
             "outLinkNum": global_links_per_router,
-            "linkArrangement": global_link_arrangement
+            "mode": "abs" if global_link_arrangement == "Absolute" else "rel"
         }
         if load_balance:
             global_dim["loadBalance"] = load_balance
@@ -312,7 +311,7 @@ class TopologyGenerator:
         }
 
         config["levels"].append(self._wrap_level_config({
-            "template": "IntraServerLevel",
+            "template": "IntraHost",
             "serverNum": server_num,
             "endpointsPerServer": gpu_per_server,
             "linkArrangement": "FullMesh",
@@ -321,7 +320,7 @@ class TopologyGenerator:
         }, load_balance))
 
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": asw_switches,
             "subBlockNum": 1,
             "groupNum": 1,
@@ -333,7 +332,7 @@ class TopologyGenerator:
         }, load_balance))
 
         config["levels"].append(self._wrap_level_config({
-            "template": "ClosInterLevel",
+            "template": "ClosLayer",
             "nodeNum": psw_switches,
             "subBlockNum": 1,
             "groupNum": 1,
@@ -362,11 +361,11 @@ class TopologyGenerator:
         for level in config.get("levels", []):
             # Each level now has dims array
             for dim in level.get("dims", []):
-                if dim.get("template") in ("IntraServerLevel", "RailOptimizedHostLevel"):
+                if dim.get("template") == "IntraHost":
                     endpoints = dim.get("endpointsPerServer", dim.get("gpuPerServer", 0))
                     total += dim.get("serverNum", 0) * endpoints
                 else:
-                    total += dim.get("nodeNum", 0) * dim.get("subBlockNum", 1)
+                    total += dim.get("nodeNum", 0) * dim.get("subBlockNum", dim.get("dim", 1))
         return total
     
     def generate_filename_with_params(self, topology_type: str, base_name: str, **kwargs) -> str:
@@ -397,10 +396,10 @@ class TopologyGenerator:
                 else:
                     dims.append(level)
             torus_dims = []
-            if dims and all(isinstance(dim, dict) and dim.get("template") == "TorusIntraLevel"
+            if dims and all(isinstance(dim, dict) and dim.get("template") == "DimTorus"
                             for dim in dims):
                 for dim in dims:
-                    sub = dim.get("subBlockNum")
+                    sub = dim.get("subBlockNum", dim.get("dim"))
                     if isinstance(sub, int) and sub > 0:
                         torus_dims.append(str(sub))
                     else:
@@ -845,415 +844,3 @@ Usage examples:
 
 if __name__ == "__main__":
     exit(main())
-
-# #!/usr/bin/env python3
-# """
-# Automatically generate ns-3 datacenter topology configuration files.
-# Supports multiple topology types: Clos, Fat-Tree, Custom, etc.
-# """
-
-# import json
-# import argparse
-# import os
-# from typing import Dict, List, Any
-# from pathlib import Path
-
-
-# class TopologyGenerator:
-#     """Topology generator class"""
-    
-#     def __init__(self):
-#         self.templates = {
-#             "clos": self._generate_clos,
-#             "fattree": self._generate_fattree,
-#             "custom": self._generate_custom
-#         }
-    
-#     def generate(self, topology_type: str, **kwargs) -> Dict[str, Any]:
-#         """Generate topology config"""
-#         if topology_type not in self.templates:
-#             raise ValueError(f"Unsupported topology type: {topology_type}")
-        
-#         return self.templates[topology_type](**kwargs)
-    
-#     def _generate_clos(self, 
-#                       spine_count: int = 4,
-#                       leaf_count: int = 8,
-#                       hosts_per_leaf: int = 2,
-#                       bandwidth: str = "10Gbps",
-#                       delay: str = "1us",
-#                       routing: str = "RuleBased") -> Dict[str, Any]:
-#         """
-#         Generate Clos topology config
-        
-#         Args:
-#             spine_count: Number of spine switches
-#             leaf_count: Number of leaf switches  
-#             hosts_per_leaf: Number of hosts per leaf
-#             bandwidth: Link bandwidth
-#             delay: Link delay
-#             routing: Routing type
-#         """
-#         config = {
-#             "routing": routing,
-#             "link": {
-#                 "bandwidth": bandwidth,
-#                 "delay": delay
-#             },
-#             "levels": []
-#         }
-        
-#         # Host level (leaf nodes)
-#         config["levels"].append({
-#             "template": "ClosInterLevel",
-#             "nodeNum": hosts_per_leaf,
-#             "subBlockNum": leaf_count
-#         })
-        
-#         # Leaf level
-#         config["levels"].append({
-#             "template": "ClosInterLevel", 
-#             "nodeNum": leaf_count,
-#             "subBlockNum": spine_count
-#         })
-        
-#         # Spine level
-#         config["levels"].append({
-#             "template": "ClosInterLevel",
-#             "nodeNum": spine_count,
-#             "subBlockNum": 1  # connect to core network
-#         })
-        
-#         return config
-    
-#     def _generate_fattree(self,
-#                           k: int = 4,
-#                           bandwidth: str = "10Gbps", 
-#                           delay: str = "1us",
-#                           routing: str = "RuleBased") -> Dict[str, Any]:
-#         """
-#         Generate Fat Tree topology config
-        
-#         Args:
-#             k: Fat Tree parameter (k-ary fat tree)
-#             bandwidth: Link bandwidth
-#             delay: Link delay
-#             routing: Routing type
-#         """
-#         config = {
-#             "routing": routing,
-#             "link": {
-#                 "bandwidth": bandwidth,
-#                 "delay": delay
-#             },
-#             "levels": []
-#         }
-        
-#         # FatTree k-ary: k must be even
-#         if k % 2 != 0:
-#             raise ValueError("FatTree parameter k must be even")
-        
-#         # Level 1: Edge level (leaf level)
-#         # k/2 hosts per edge switch
-#         hosts_per_switch = k // 2
-        
-#         config["levels"].append({
-#             "template": "ClosInterLevel",
-#             "nodeNum": 1,
-#             "subBlockNum": hosts_per_switch   # hosts per edge switch
-#         })
-        
-#         # Level 1: Aggregation level (spine level) 
-#         # Each pod has k/2 edge + k/2 aggregation switches
-#         pod_num = k
-#         aggs_per_pod = k // 2
-#         edges_per_pod = k // 2
-        
-#         config["levels"].append({
-#             "template": "ClosInterLevel",
-#             "nodeNum": aggs_per_pod,        # aggregation switches per pod
-#             "subBlockNum": edges_per_pod    # edge switches per pod
-#         })
-        
-#         # Level 2: Core level
-#         # Core level connects to pods using SingleInterLevel
-#         core_group_num = k // 2
-#         core_switches = core_group_num ** 2
-        
-#         config["levels"].append({
-#             "template": "SingleInterLevel",
-#             "nodeNum": core_switches,         # core switches
-#             "subBlockNum": k,            # connect to pods
-#             "groupNum": core_group_num
-#         })
-        
-#         return config
-    
-#     def _generate_custom(self, 
-#                         levels: List[Dict[str, Any]],
-#                         bandwidth: str = "10Gbps",
-#                         delay: str = "1us", 
-#                         routing: str = "RuleBased") -> Dict[str, Any]:
-#         """
-#         Generate custom topology config
-        
-#         Args:
-#             levels: Custom level config list
-#             bandwidth: Link bandwidth
-#             delay: Link delay
-#             routing: Routing type
-#         """
-#         config = {
-#             "routing": routing,
-#             "link": {
-#                 "bandwidth": bandwidth,
-#                 "delay": delay
-#             },
-#             "levels": levels
-#         }
-        
-#         return config
-    
-#     def save_config(self, config: Dict[str, Any], output_file: str) -> None:
-#         """Save config to file"""
-#         # Ensure output directory exists
-#         output_path = Path(output_file)
-#         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-#         # Save as formatted JSON
-#         with open(output_file, 'w', encoding='utf-8') as f:
-#             json.dump(config, f, indent=2, ensure_ascii=False)
-        
-#         print(f"Topology config file saved to: {output_file}")
-#         print(f"Total node count: {self._calculate_total_nodes(config)}")
-    
-#     def _calculate_total_nodes(self, config: Dict[str, Any]) -> int:
-#         """Calculate total node count in topology"""
-#         total = 0
-#         for level in config.get("levels", []):
-#             total += level.get("nodeNum", 0) * level.get("subBlockNum", 1)
-#         return total
-    
-#     def generate_filename_with_params(self, topology_type: str, base_name: str, **kwargs) -> str:
-#         """Generate filename with parameters as suffix"""
-#         suffix_parts = []
-        
-#         if topology_type == "clos":
-#             spine = kwargs.get("spine_count", 4)
-#             leaf = kwargs.get("leaf_count", 8)
-#             hosts = kwargs.get("hosts_per_leaf", 2)
-#             suffix_parts.extend([f"s{spine}", f"l{leaf}", f"h{hosts}"])
-            
-#         elif topology_type == "fattree":
-#             k = kwargs.get("k", 4)
-#             suffix_parts.append(f"k{k}")
-            
-#         elif topology_type == "custom":
-#             # For custom topology, use a hash of the levels config
-#             levels = kwargs.get("levels", [])
-#             levels_str = json.dumps(levels, sort_keys=True)
-#             import hashlib
-#             hash_obj = hashlib.md5(levels_str.encode())
-#             suffix_parts.append(f"custom_{hash_obj.hexdigest()[:8]}")
-        
-#         # Add routing type if not default
-#         routing = kwargs.get("routing", "RuleBased")
-#         if routing != "RuleBased":
-#             suffix_parts.append(f"r{routing.lower()}")
-        
-#         # Add link parameters if not default
-#         bandwidth = kwargs.get("bandwidth", "10Gbps")
-#         delay = kwargs.get("delay", "1us")
-#         if bandwidth != "10Gbps" or delay != "1us":
-#             # Clean bandwidth and delay for filename
-#             bw_clean = bandwidth.replace("Gbps", "g").replace("Mbps", "m").replace("bps", "b")
-#             delay_clean = delay.replace("us", "u").replace("ns", "n").replace("ms", "m")
-#             suffix_parts.extend([bw_clean, delay_clean])
-        
-#         # Construct final filename
-#         if suffix_parts:
-#             suffix = "_".join(suffix_parts)
-#             name_without_ext = base_name.rsplit('.', 1)[0] if '.' in base_name else base_name
-#             return f"{name_without_ext}_{suffix}.json"
-#         else:
-#             return base_name
-
-
-# def main():
-#     """Main function"""
-#     parser = argparse.ArgumentParser(
-#         description="Automatically generate ns-3 datacenter topology config file",
-#         formatter_class=argparse.RawDescriptionHelpFormatter,
-#         epilog="""
-# Usage examples:
-#   # Generate Clos topology (auto filename: clos_s4_l8_h2.json)
-#   python topology_generator.py clos
-
-#   # Generate Clos topology with custom parameters (auto filename: clos_s6_l12_h4_40g_500n.json)
-#   python topology_generator.py clos --spine 6 --leaf 12 --hosts 4 --bandwidth 40Gbps --delay 500ns
-
-#   # Generate Fat Tree topology (auto filename: fattree_k6.json)  
-#   python topology_generator.py fattree --k 4
-
-#   # Specify custom base name
-#   python topology_generator.py clos -o my_clos.json --spine 4 --leaf 8
-#         """
-#     )
-    
-#     parser.add_argument(
-#         "topology_type", 
-#         choices=["clos", "fattree", "custom"],
-#         help="Topology type"
-#     )
-    
-#     parser.add_argument(
-#         "-o", "--output",
-#         help="Output file name (if not specified, auto-generated with parameters)"
-#     )
-    
-#     parser.add_argument(
-#         "--routing",
-#         choices=["RuleBased", "Global"],
-#         default="RuleBased",
-#         help="Routing type (default: RuleBased)"
-#     )
-    
-#     parser.add_argument(
-#         "--bandwidth",
-#         default="10Gbps",
-#         help="Link bandwidth (default: 10Gbps)"
-#     )
-    
-#     parser.add_argument(
-#         "--delay", 
-#         default="1us",
-#         help="Link delay (default: 1us)"
-#     )
-    
-#     # Clos topology parameters
-#     parser.add_argument(
-#         "--spine",
-#         type=int,
-#         default=4,
-#         help="Number of spine switches (Clos topology)"
-#     )
-    
-#     parser.add_argument(
-#         "--leaf",
-#         type=int, 
-#         default=8,
-#         help="Number of leaf switches (Clos topology)"
-#     )
-    
-#     parser.add_argument(
-#         "--hosts",
-#         type=int,
-#         default=2,
-#         help="Number of hosts per leaf (Clos topology)"
-#     )
-    
-#     # Fat Tree parameters
-#     parser.add_argument(
-#         "--k",
-#         type=int,
-#         default=4,
-#         help="Fat Tree parameter k (k-ary fat tree)"
-#     )
-    
-#     # Custom topology parameters
-#     parser.add_argument(
-#         "--levels",
-#         type=str,
-#         help="Custom level config (JSON string)"
-#     )
-    
-#     args = parser.parse_args()
-    
-#     # Create generator
-#     generator = TopologyGenerator()
-    
-#     try:
-#         # Generate config by type
-#         if args.topology_type == "clos":
-#             config = generator.generate(
-#                 "clos",
-#                 spine_count=args.spine,
-#                 leaf_count=args.leaf,
-#                 hosts_per_leaf=args.hosts,
-#                 bandwidth=args.bandwidth,
-#                 delay=args.delay,
-#                 routing=args.routing
-#             )
-            
-#         elif args.topology_type == "fattree":
-#             config = generator.generate(
-#                 "fattree",
-#                 k=args.k,
-#                 bandwidth=args.bandwidth,
-#                 delay=args.delay,
-#                 routing=args.routing
-#             )
-            
-#         elif args.topology_type == "custom":
-#             if not args.levels:
-#                 parser.error("--levels argument is required (for custom topology type)")
-            
-#             levels = json.loads(args.levels)
-#             config = generator.generate(
-#                 "custom",
-#                 levels=levels,
-#                 bandwidth=args.bandwidth,
-#                 delay=args.delay,
-#                 routing=args.routing
-#             )
-        
-#         # Generate output filename with parameters
-#         if args.output:
-#             # User specified filename, use it as base name
-#             final_filename = generator.generate_filename_with_params(
-#                 args.topology_type, args.output,
-#                 spine_count=args.spine,
-#                 leaf_count=args.leaf,
-#                 hosts_per_leaf=args.hosts,
-#                 k=args.k,
-#                 bandwidth=args.bandwidth,
-#                 delay=args.delay,
-#                 routing=args.routing,
-#                 levels=json.loads(args.levels) if args.levels else None
-#             )
-#         else:
-#             # Auto-generate filename based on topology type
-#             base_name = f"{args.topology_type}.json"
-#             final_filename = generator.generate_filename_with_params(
-#                 args.topology_type, base_name,
-#                 spine_count=args.spine,
-#                 leaf_count=args.leaf,
-#                 hosts_per_leaf=args.hosts,
-#                 k=args.k,
-#                 bandwidth=args.bandwidth,
-#                 delay=args.delay,
-#                 routing=args.routing,
-#                 levels=json.loads(args.levels) if args.levels else None
-#             )
-        
-#         # Save config
-#         output_path = f"src/datacenter/examples/inputs/{final_filename}"
-#         generator.save_config(config, output_path)
-        
-#         # Print config summary
-#         print("\n=== Topology Config Summary ===")
-#         print(f"Type: {args.topology_type}")
-#         print(f"Routing: {args.routing}")
-#         print(f"Link: {args.bandwidth}, {args.delay}")
-#         print(f"Number of levels: {len(config['levels'])}")
-#         print(f"Output file: {final_filename}")
-        
-#     except Exception as e:
-#         print(f"Error: {e}")
-#         return 1
-    
-#     return 0
-
-
-# if __name__ == "__main__":
-#     exit(main())

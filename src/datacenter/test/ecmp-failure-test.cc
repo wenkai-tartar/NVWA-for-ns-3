@@ -45,7 +45,7 @@ BuildFromJson(const json& cfg, TopologyBuilder& builder, std::shared_ptr<Topolog
         for (const auto& dim : lv.at("dims"))
         {
             std::string type = dim.at("template");
-            if (type == "ClosInterLevel")
+            if (type == "ClosLayer")
             {
                 ++levelId;
                 uint32_t nodeNum = dim.at("nodeNum");

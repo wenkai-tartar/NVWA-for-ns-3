@@ -1,0 +1,48 @@
+{
+  "routing": "RuleBased",
+  "link": {
+    "bandwidth": "100Gbps",
+    "delay": "1us"
+  },
+  "levels": [
+    {
+      "dims": [
+        {
+          "template": "IntraHost",
+          "serverNum": 32,
+          "endpointsPerServer": 8,
+          "linkArrangement": "FullMesh",
+          "bandwidth": "900Gbps",
+          "delay": "100ns"
+        }
+      ]
+    },
+    {
+      "dims": [
+        {
+          "template": "ClosLayer",
+          "nodeNum": 16,
+          "subBlockNum": 1,
+          "groupNum": 1,
+          "linkArrangement": "RailOptimized",
+          "endpointsPerServer": 8,
+          "nicsPerAswitch": 16,
+          "bandwidth": "100Gbps",
+          "delay": "1us"
+        }
+      ]
+    },
+    {
+      "dims": [
+        {
+          "template": "ClosLayer",
+          "nodeNum": 8,
+          "subBlockNum": 1,
+          "groupNum": 1,
+          "bandwidth": "100Gbps",
+          "delay": "1us"
+        }
+      ]
+    }
+  ]
+}

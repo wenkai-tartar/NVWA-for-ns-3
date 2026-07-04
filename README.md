@@ -143,11 +143,9 @@ Core topology components:
 - `StructuredAddress`, `StructuredAddressDirectory`, and `StructuredTopology`
   define hierarchical node addresses and topology lookup.
 - `TopologyBuilder` composes topology levels from reusable templates.
-- The JSON constructor accepts the paper template names `ClosLayer`,
+- The JSON constructor uses the paper template names `ClosLayer`,
   `BCubeLayer`, `ZCubeLayer`, `CliqeLF`, `CliqeToR`, `DimMesh`,
-  `DimFullMesh`, and `DimTorus`. It also keeps the older implementation names
-  `ClosInterLevel`, `FullIntraLevel`, `TorusIntraLevel`, and
-  `IntraServerLevel` for compatibility.
+  `DimFullMesh`, `DimTorus`, and `IntraHost`.
 - `ClosInterLevelTemplate`, `BCubeLayerTemplate`, `ZCubeLayerTemplate`,
   `MeshIntraLevelTemplate`, `FullIntraLevelTemplate`,
   `TorusIntraLevelTemplate`, and `IntraServerLevelTemplate` describe the
@@ -168,10 +166,11 @@ Input configuration:
 
 - Topology JSON files describe `routing`, default `link` parameters, and a list
   of `levels`.
-- Each level contains one or more `dims`; each dim selects one of the supported
+- Each level may contain one or more `dims`, or a direct single-template
+  object. Each dim selects one of the supported
   interconnection templates listed above. Common paper-style parameters such as
-  `group_num`, `dim`, and `mode` are accepted alongside the legacy camelCase
-  fields.
+  `group_num`, `dim`, `mode`, `LinkArrangement`, `link_arrangement`, and
+  `load_balance` are accepted alongside camelCase fields.
 - Failure JSON files contain scheduled link failures and are consumed by
   `FailureHelper`.
 

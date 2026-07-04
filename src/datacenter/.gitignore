@@ -1,11 +1,14 @@
 examples/traces
 examples/inputs/*.json
 !examples/inputs/bcube_n4_k1_100g_1u.json
+!examples/inputs/dragonfly_g5_a2_p2_h2_100g_1u.json
 !examples/inputs/dragonfly_plus_g3_a2_p2_h1_100g_1u.json
+!examples/inputs/fattree_k4_100g_1u.json
 !examples/inputs/fullmesh_4_100g_1u.json
 !examples/inputs/hpn_small_100g_1u.json
 !examples/inputs/mesh_3x3_100g_1u.json
 !examples/inputs/multihomed_fattree_k4_100g_1u.json
+!examples/inputs/rail_optimized_g256_gps8_npa16_psw8_100g_1u.json
 !examples/inputs/star_8_100g_1u.json
 !examples/inputs/torus_3x3x3_100g_1u.json
 !examples/inputs/ub_mesh_2x2_100g_1u.json
