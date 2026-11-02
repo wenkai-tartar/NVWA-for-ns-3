@@ -183,6 +183,29 @@ python3 test.py --no-build --suite ecmp-failure
 python3 test.py --no-build --suite intra-server-routing
 ```
 
+## Citation
+
+If you use NVWA for ns-3 in your research, please cite:
+
+Wenkai Li, Ran Shu, Peng Zhang, Yiren Zhao, Danfeng Shan, and Yongqiang Xiong.
+2026. **Nüwa: A Generative Control Plane for AI Network Simulation**.
+In *Proceedings of the ACM SIGCOMM 2026 Conference* (SIGCOMM '26),
+1601–1616. ACM. <https://doi.org/10.1145/3789240.3829106>.
+
+```bibtex
+@inproceedings{li2026nuwa,
+  author    = {Li, Wenkai and Shu, Ran and Zhang, Peng and Zhao, Yiren and Shan, Danfeng and Xiong, Yongqiang},
+  title     = {{N\"{u}wa}: A Generative Control Plane for {AI} Network Simulation},
+  booktitle = {Proceedings of the ACM SIGCOMM 2026 Conference},
+  series    = {SIGCOMM '26},
+  year      = {2026},
+  pages     = {1601--1616},
+  publisher = {ACM},
+  doi       = {10.1145/3789240.3829106},
+  url       = {https://doi.org/10.1145/3789240.3829106}
+}
+```
+
 ## Links
 
 - NVWA for ns-3 repository: <https://github.com/wenkai-tartar/NVWA-for-ns-3>
