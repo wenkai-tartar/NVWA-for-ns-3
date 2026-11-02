@@ -208,8 +208,4 @@ In *Proceedings of the ACM SIGCOMM 2026 Conference* (SIGCOMM '26),
 
 ## Links
 
-- NVWA for ns-3 repository: <https://github.com/wenkai-tartar/NVWA-for-ns-3>
 - ns-3 project: <https://www.nsnam.org/>
-- ns-3 manual: <https://www.nsnam.org/docs/manual/html/>
-- ns-3 tutorial: <https://www.nsnam.org/docs/tutorial/html/>
-- License: GNU General Public License v2.0, see `LICENSE`.
